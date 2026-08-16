@@ -3,40 +3,65 @@ import './index.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
-type Screen = 'login' | 'lookup' | 'redeem' | 'success';
+type Screen = 'login' | 'lookup' | 'redeem' | 'success' | 'dashboard';
 
 interface CardInfo {
-  balance: number;
   status: string;
-  recipientName: string;
+  mobileNumber: string;
 }
 
 interface RedeemResult {
-  redeemedAmount: number;
-  remainingBalance: number;
-  transactionId: number;
+  success: boolean;
+}
+
+interface AdminRecord {
+  name: string;
+  mobileNumber: string;
+  code: string;
+  status: string;
+  generatedAt: string | null;
+  redeemedAt: string | null;
+}
+
+interface AdminStats {
+  totalGenerated: number;
+  totalRedeemed: number;
+  records: AdminRecord[];
 }
 
 function App() {
   const [screen, setScreen] = useState<Screen>('login');
   const [pin, setPin] = useState('');
   const [code, setCode] = useState('');
-  const [amount, setAmount] = useState('');
   const [cardInfo, setCardInfo] = useState<CardInfo | null>(null);
   const [result, setResult] = useState<RedeemResult | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // ─── STAFF AUTH ───
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === '1234') { // In prod, call a real /api/auth/staff endpoint
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Login failed');
+      
+      setToken(data.token);
       setScreen('lookup');
-      setError('');
-    } else {
-      setError('Invalid PIN. Please try again.');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setPin('');
     }
-    setPin('');
   };
 
   // ─── VALIDATE CARD ───
@@ -47,21 +72,23 @@ function App() {
     setCardInfo(null);
 
     try {
-      const res = await fetch(`${API}/api/admin/gift-cards/validate`, {
+      const res = await fetch(`${API}/api/bogo/admin/lookup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ code: code.toUpperCase().trim() }),
       });
       const data = await res.json();
 
       if (!res.ok || !data.valid) {
-        throw new Error(data.message || 'Invalid card');
+        throw new Error(data.message || 'Invalid or already redeemed card');
       }
 
       setCardInfo({
-        balance: data.balance,
         status: data.status,
-        recipientName: data.recipientName || 'Customer',
+        mobileNumber: data.mobileNumber,
       });
       setScreen('redeem');
     } catch (err: any) {
@@ -78,24 +105,39 @@ function App() {
     setError('');
 
     try {
-      const amt = parseFloat(amount);
-      if (isNaN(amt) || amt <= 0) throw new Error('Enter a valid amount');
-      if (amt > (cardInfo?.balance ?? 0)) throw new Error(`Amount exceeds balance of ₹${cardInfo?.balance}`);
-
-      const res = await fetch(`${API}/api/admin/gift-cards/redeem`, {
+      const res = await fetch(`${API}/api/bogo/redeem`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.toUpperCase().trim(), amount: amt, storeId: 1 }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: code.toUpperCase().trim() }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Redemption failed');
 
-      setResult({
-        redeemedAmount: data.redeemedAmount,
-        remainingBalance: data.remainingBalance,
-        transactionId: data.transactionId,
-      });
+      setResult({ success: true });
       setScreen('success');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDashboard = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API}/api/bogo/admin/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch stats');
+      const data = await res.json();
+      setStats(data);
+      setScreen('dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -105,7 +147,6 @@ function App() {
 
   const reset = () => {
     setCode('');
-    setAmount('');
     setCardInfo(null);
     setResult(null);
     setError('');
@@ -134,9 +175,9 @@ function App() {
                 className="w-full text-center text-2xl tracking-widest px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
               />
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-              <button type="submit"
-                className="w-full bg-richBlack text-cream font-bold py-4 rounded-xl hover:bg-black transition-all">
-                Login
+              <button type="submit" disabled={loading}
+                className="w-full bg-richBlack text-cream font-bold py-4 rounded-xl hover:bg-black transition-all disabled:opacity-50">
+                {loading ? 'Logging in...' : 'Login'}
               </button>
             </form>
           </div>
@@ -146,9 +187,18 @@ function App() {
       {/* ─── CARD LOOKUP ─── */}
       {screen === 'lookup' && (
         <div className="max-w-sm w-full">
-          <div className="bg-richBlack text-cream rounded-t-2xl p-5">
-            <h1 className="text-xl font-bold">Gift Card Redemption</h1>
-            <p className="text-gray-400 text-sm mt-1">Enter the customer's card code</p>
+          <div className="bg-richBlack text-cream rounded-t-2xl p-5 flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-bold">BOGO Redemption</h1>
+              <p className="text-gray-400 text-sm mt-1">Enter the customer's card code</p>
+            </div>
+            <button 
+              onClick={handleOpenDashboard} 
+              className="flex items-center gap-2 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-cream px-4 py-2 rounded-xl text-sm font-bold transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+              Dashboard
+            </button>
           </div>
           <div className="bg-white rounded-b-2xl shadow-md border border-t-0 border-gray-100 p-6">
             <form onSubmit={handleLookup} className="space-y-4">
@@ -182,43 +232,27 @@ function App() {
           <div className="bg-white rounded-b-2xl shadow-md border border-t-0 border-gray-100 p-6 space-y-5">
             {/* Balance display */}
             <div className="bg-green-50 border border-green-100 rounded-xl p-5 text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Available Balance</p>
-              <p className="text-5xl font-bold text-green-700">₹{Number(cardInfo.balance).toFixed(2)}</p>
-              {cardInfo.recipientName && (
-                <p className="text-sm text-gray-500 mt-2">For: {cardInfo.recipientName}</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Offer Available</p>
+              <p className="text-3xl font-bold text-green-700">Buy 1 Get 1 Free</p>
+              {cardInfo.mobileNumber && (
+                <p className="text-sm text-gray-500 mt-2">Mobile: +91 {cardInfo.mobileNumber}</p>
               )}
             </div>
 
-            {/* Amount entry */}
+            {/* Action */}
             <form onSubmit={handleRedeem} className="space-y-3">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Amount to Redeem
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">₹</span>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => { setAmount(e.target.value); setError(''); }}
-                  placeholder="0.00"
-                  min="1"
-                  max={cardInfo.balance}
-                  step="0.01"
-                  className="w-full pl-8 pr-4 py-4 text-xl font-bold rounded-xl border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
-                />
-              </div>
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl text-center">
                   {error}
                 </div>
               )}
-              <button type="submit" disabled={loading || !amount}
+              <button type="submit" disabled={loading}
                 className="w-full bg-richBlack text-cream font-bold py-4 rounded-xl hover:bg-black transition-all disabled:opacity-50 text-lg">
-                {loading ? 'Processing...' : `Redeem ₹${amount || '0'}`}
+                {loading ? 'Processing...' : `Mark as Redeemed`}
               </button>
               <button type="button" onClick={() => { setScreen('lookup'); setError(''); }}
-                className="w-full text-gray-400 text-sm hover:text-black transition-colors">
-                ← Different Card
+                className="w-full text-gray-400 text-sm hover:text-black transition-colors mt-2">
+                ← Back
               </button>
             </form>
           </div>
@@ -233,18 +267,14 @@ function App() {
               ✅
             </div>
             <div>
-              <h2 className="text-xl font-bold text-richBlack">Redemption Successful!</h2>
-              <p className="text-gray-500 text-sm mt-1">Txn #{result.transactionId}</p>
+              <h2 className="text-xl font-bold text-richBlack">Redeemed Successfully!</h2>
+              <p className="text-gray-500 text-sm mt-1">This code has been marked as used.</p>
             </div>
 
             <div className="space-y-3">
               <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Redeemed</p>
-                <p className="text-3xl font-bold text-red-600">- ₹{Number(result.redeemedAmount).toFixed(2)}</p>
-              </div>
-              <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Remaining Balance</p>
-                <p className="text-3xl font-bold text-green-700">₹{Number(result.remainingBalance).toFixed(2)}</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                <p className="text-xl font-bold text-red-600">USED</p>
               </div>
             </div>
 
@@ -252,6 +282,74 @@ function App() {
               className="w-full bg-richBlack text-cream font-bold py-4 rounded-xl hover:bg-black transition-all">
               Redeem Another Card
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── DASHBOARD ─── */}
+      {screen === 'dashboard' && stats && (
+        <div className="w-full max-w-5xl">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-richBlack">Admin Dashboard</h1>
+              <p className="text-gray-500">Live Campaign Statistics</p>
+            </div>
+            <button onClick={reset} className="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300 transition">
+              Back to Scanner
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+              <p className="text-gray-500 font-bold mb-1">Generated</p>
+              <p className="text-4xl font-black text-richBlack">{stats.totalGenerated}</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+              <p className="text-gray-500 font-bold mb-1">Redeemed</p>
+              <p className="text-4xl font-black text-green-600">{stats.totalRedeemed}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-sm font-bold text-gray-500 uppercase tracking-wider">
+                    <th className="p-4">Customer</th>
+                    <th className="p-4">Mobile</th>
+                    <th className="p-4">Code</th>
+                    <th className="p-4">Generated</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Redeemed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {stats.records.map((r, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50/50 transition">
+                      <td className="p-4 font-medium">{r.name}</td>
+                      <td className="p-4 text-gray-600">{r.mobileNumber}</td>
+                      <td className="p-4 font-mono font-medium">{r.code}</td>
+                      <td className="p-4 text-sm text-gray-500">
+                        {r.generatedAt ? new Date(r.generatedAt).toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${r.status === 'REDEEMED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-gray-500">
+                        {r.redeemedAt ? new Date(r.redeemedAt).toLocaleString() : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                  {stats.records.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-gray-400">No records found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
