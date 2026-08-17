@@ -170,8 +170,7 @@ function App() {
                 type="password"
                 value={pin}
                 onChange={(e) => { setPin(e.target.value); setError(''); }}
-                maxLength={6}
-                placeholder="● ● ● ●"
+                placeholder="Enter password..."
                 className="w-full text-center text-2xl tracking-widest px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
               />
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
