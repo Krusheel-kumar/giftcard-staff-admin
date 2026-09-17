@@ -91,6 +91,7 @@ function App() {
         mobileNumber: data.mobileNumber,
         customerName: data.customerName,
         rewardName: data.rewardName,
+        journey: data.journey,
       } as any);
       setScreen('redeem');
     } catch (err: any) {
@@ -230,18 +231,45 @@ function App() {
       {screen === 'redeem' && cardInfo && (
         <div className="max-w-sm w-full">
           <div className="bg-richBlack text-cream rounded-t-2xl p-5">
-            <h1 className="text-xl font-bold">Card Valid ✅</h1>
+            <h1 className="text-xl font-bold">Valid Code ✅</h1>
             <p className="text-sm text-gray-400 font-mono mt-1">{code}</p>
           </div>
           <div className="bg-white rounded-b-2xl shadow-md border border-t-0 border-gray-100 p-6 space-y-5">
             {/* Balance display */}
             <div className="bg-green-50 border border-green-100 rounded-xl p-5 text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Offer Available</p>
-              <p className="text-2xl font-bold text-green-700">{(cardInfo as any).rewardName || 'Special Offer'}</p>
+              <p className="text-xs text-green-700 uppercase tracking-wider mb-1 font-bold">Valid Offer For {(cardInfo as any).customerName?.split(' ')[0]}</p>
+              <p className="text-2xl font-bold text-green-700 mb-2">{(cardInfo as any).rewardName || 'Special Offer'}</p>
               {cardInfo.mobileNumber && (
-                <p className="text-sm text-gray-500 mt-2">Mobile: +91 {cardInfo.mobileNumber}</p>
+                <p className="text-xs text-gray-500 bg-white inline-block px-3 py-1 rounded-full border border-gray-200">📞 {cardInfo.mobileNumber}</p>
               )}
             </div>
+
+            {/* Customer Journey Timeline */}
+            {(cardInfo as any).journey && (
+              <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Customer Journey</p>
+                <div className="space-y-3">
+                  {(cardInfo as any).journey.map((r: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+                        ${r.status === 'REDEEMED' ? 'bg-gray-200 text-gray-500' : 
+                          r.status === 'ACTIVE' ? 'bg-gold text-richBlack ring-4 ring-gold/20' : 
+                          'bg-gray-100 text-gray-300'}`}>
+                        {r.status === 'REDEEMED' ? '✓' : r.sequence}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm font-bold ${r.status === 'ACTIVE' ? 'text-richBlack' : 'text-gray-500'}`}>
+                          {r.name}
+                        </p>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+                          {r.status} {r.redeemedAt && '• ' + new Date(r.redeemedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Action */}
             <form onSubmit={handleRedeem} className="space-y-3">
