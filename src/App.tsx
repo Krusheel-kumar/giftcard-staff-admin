@@ -72,7 +72,7 @@ function App() {
     setCardInfo(null);
 
     try {
-      const res = await fetch(`${API}/api/bogo/admin/lookup`, {
+      const res = await fetch(`${API}/api/rewards/admin/lookup`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -89,7 +89,9 @@ function App() {
       setCardInfo({
         status: data.status,
         mobileNumber: data.mobileNumber,
-      });
+        customerName: data.customerName,
+        rewardName: data.rewardName,
+      } as any);
       setScreen('redeem');
     } catch (err: any) {
       setError(err.message);
@@ -105,16 +107,19 @@ function App() {
     setError('');
 
     try {
-      const res = await fetch(`${API}/api/bogo/redeem`, {
+      const res = await fetch(`${API}/api/rewards/redeem`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code: code.toUpperCase().trim() }),
+        body: JSON.stringify({ 
+          couponCode: code.toUpperCase().trim(),
+          storeId: 'FILM_NAGAR' 
+        }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Redemption failed');
+      if (!res.ok) throw new Error(data.message || 'Redemption failed');
 
       setResult({ success: true });
       setScreen('success');
@@ -129,7 +134,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API}/api/bogo/admin/stats`, {
+      const res = await fetch(`${API}/api/rewards/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -188,7 +193,7 @@ function App() {
         <div className="max-w-sm w-full">
           <div className="bg-richBlack text-cream rounded-t-2xl p-5 flex justify-between items-center">
             <div>
-              <h1 className="text-xl font-bold">BOGO Redemption</h1>
+              <h1 className="text-xl font-bold">Rewards Redemption</h1>
               <p className="text-gray-400 text-sm mt-1">Enter the customer's card code</p>
             </div>
             <button 
@@ -204,7 +209,7 @@ function App() {
               <input
                 value={code}
                 onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(''); }}
-                placeholder="POB-XXXX-XXXX"
+                placeholder="POBFN-XXX-XXXX"
                 className="w-full text-center font-mono text-lg tracking-widest px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-gold outline-none uppercase"
               />
               {error && (
@@ -232,7 +237,7 @@ function App() {
             {/* Balance display */}
             <div className="bg-green-50 border border-green-100 rounded-xl p-5 text-center">
               <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Offer Available</p>
-              <p className="text-3xl font-bold text-green-700">Buy 1 Get 1 Free</p>
+              <p className="text-2xl font-bold text-green-700">{(cardInfo as any).rewardName || 'Special Offer'}</p>
               {cardInfo.mobileNumber && (
                 <p className="text-sm text-gray-500 mt-2">Mobile: +91 {cardInfo.mobileNumber}</p>
               )}
