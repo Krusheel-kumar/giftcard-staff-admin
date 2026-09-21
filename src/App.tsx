@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './index.css';
+import { CustomersTab } from './components/CustomersTab';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -31,6 +32,7 @@ interface AdminStats {
 
 function App() {
   const [screen, setScreen] = useState<Screen>('login');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'customers'>('overview');
   const [pin, setPin] = useState('');
   const [code, setCode] = useState('');
   const [cardInfo, setCardInfo] = useState<CardInfo | null>(null);
@@ -320,69 +322,85 @@ function App() {
 
       {/* ─── DASHBOARD ─── */}
       {screen === 'dashboard' && stats && (
-        <div className="w-full max-w-5xl">
+        <div className="w-full max-w-6xl">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold text-richBlack">Admin Dashboard</h1>
-              <p className="text-gray-500">Live Campaign Statistics</p>
+              <p className="text-gray-500">Live Campaign Statistics & Customer Audits</p>
             </div>
             <button onClick={reset} className="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300 transition">
               Back to Scanner
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-              <p className="text-gray-500 font-bold mb-1">Generated</p>
-              <p className="text-4xl font-black text-richBlack">{stats.totalGenerated}</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-              <p className="text-gray-500 font-bold mb-1">Redeemed</p>
-              <p className="text-4xl font-black text-green-600">{stats.totalRedeemed}</p>
-            </div>
+          <div className="flex gap-4 mb-6 border-b border-gray-200">
+            <button 
+              onClick={() => setDashboardTab('overview')} 
+              className={`pb-3 px-4 font-bold text-sm transition-colors ${dashboardTab === 'overview' ? 'border-b-2 border-gold text-richBlack' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Overview
+            </button>
+            <button 
+              onClick={() => setDashboardTab('customers')} 
+              className={`pb-3 px-4 font-bold text-sm transition-colors ${dashboardTab === 'customers' ? 'border-b-2 border-gold text-richBlack' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Customer Audits (Memory-Safe)
+            </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-sm font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="p-4">Customer</th>
-                    <th className="p-4">Mobile</th>
-                    <th className="p-4">Code</th>
-                    <th className="p-4">Generated</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Redeemed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {stats.records.map((r, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50 transition">
-                      <td className="p-4 font-medium">{r.name}</td>
-                      <td className="p-4 text-gray-600">{r.mobileNumber}</td>
-                      <td className="p-4 font-mono font-medium">{r.code}</td>
-                      <td className="p-4 text-sm text-gray-500">
-                        {r.generatedAt ? new Date(r.generatedAt).toLocaleString() : 'N/A'}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${r.status === 'REDEEMED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-gray-500">
-                        {r.redeemedAt ? new Date(r.redeemedAt).toLocaleString() : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                  {stats.records.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-400">No records found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {dashboardTab === 'overview' ? (
+            <>
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                  <p className="text-gray-500 font-bold mb-1">Generated</p>
+                  <p className="text-4xl font-black text-richBlack">{stats.totalGenerated}</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                  <p className="text-gray-500 font-bold mb-1">Redeemed</p>
+                  <p className="text-4xl font-black text-green-600">{stats.totalRedeemed}</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100 text-sm font-bold text-gray-500 uppercase tracking-wider">
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Mobile</th>
+                        <th className="p-4">Code</th>
+                        <th className="p-4">Generated</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Redeemed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {stats.records.map((r, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/50 transition">
+                          <td className="p-4 font-medium">{r.name}</td>
+                          <td className="p-4 text-gray-600">{r.mobileNumber}</td>
+                          <td className="p-4 font-mono font-medium">{r.code}</td>
+                          <td className="p-4 text-sm text-gray-500">
+                            {r.generatedAt ? new Date(r.generatedAt).toLocaleString() : 'N/A'}
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded-md text-xs font-bold ${r.status === 'REDEEMED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-sm text-gray-500">
+                            {r.redeemedAt ? new Date(r.redeemedAt).toLocaleString() : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <CustomersTab token={token!} />
+          )}
         </div>
       )}
     </div>
