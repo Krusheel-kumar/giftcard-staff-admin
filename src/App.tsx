@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './index.css';
 import { CustomersTab } from './components/CustomersTab';
 
@@ -41,6 +41,27 @@ function App() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // HIGH-5 FIX: Auto-logout after 15 minutes of inactivity
+  const logout = useCallback(() => {
+    setToken(null);
+    setScreen('login');
+    setPin('');
+    setCode('');
+    setCardInfo(null);
+    setResult(null);
+    setStats(null);
+    setError('');
+  }, []);
+
+  useEffect(() => {
+    if (!token) return; // Only run timer when logged in
+    const timer = setTimeout(() => {
+      alert('Session expired due to inactivity. Please log in again.');
+      logout();
+    }, 15 * 60 * 1000); // 15 minutes
+    return () => clearTimeout(timer);
+  }, [token, screen, logout]); // Resets timer on any screen change (activity)
 
   // ─── STAFF AUTH ───
   const handleLogin = async (e: React.FormEvent) => {
@@ -199,13 +220,21 @@ function App() {
               <h1 className="text-xl font-bold">Rewards Redemption</h1>
               <p className="text-gray-400 text-sm mt-1">Enter the customer's card code</p>
             </div>
-            <button 
-              onClick={handleOpenDashboard} 
-              className="flex items-center gap-2 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-cream px-4 py-2 rounded-xl text-sm font-bold transition-all"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
-              Dashboard
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleOpenDashboard} 
+                className="flex items-center gap-2 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 text-cream px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                Dashboard
+              </button>
+              <button
+                onClick={logout}
+                className="flex items-center gap-2 bg-red-900/40 hover:bg-red-800/60 border border-red-700 text-red-300 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              >
+                Logout
+              </button>
+            </div>
           </div>
           <div className="bg-white rounded-b-2xl shadow-md border border-t-0 border-gray-100 p-6">
             <form onSubmit={handleLookup} className="space-y-4">
